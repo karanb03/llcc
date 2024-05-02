@@ -1,0 +1,1486 @@
+﻿Q1. Write a program to generate Symbol table of a two-pass Assembler for the given Assembly language source code.
+INPUT/CODE
+LOOP
+START 180 READ M READ N
+MOVER AREG, M
+MOVER BREG, N COMP BREG, =’200’
+BC GT, LOOP BACK SUB AREG, M
+COMP AREG, =’500’ BC LT, BACK
+STOP
+M DS 1 N DS 1
+END
+CODE:
+#include <iostream>
+#include <sstream>
+#include <unordered_map>
+#include <vector>
+#include <string>
+
+
+using namespace std;
+
+
+// Function to generate symbol table from assembly code
+unordered_map<string, int> generateSymbolTable(const string& assemblyCode) {
+unordered_map<string, int> symbolTable;
+int address = 0;
+
+
+// Mnemonic Table (Reserved Mnemonics)
+unordered_map<string, pair<string, int>> reservedMnemonics = {
+{"STOP", {"00", 0}},
+{"ADD", {"01", 2}},
+{"SUB", {"02", 2}},
+{"MUL", {"03", 2}},
+{"MOVER", {"04", 2}},
+{"MOVEM", {"05", 2}},
+{"COMP", {"06", 2}},
+{"BC", {"07", 2}},
+{"DIV", {"08", 2}},
+{"READ", {"09", 1}},
+{"PRINT", {"10", 1}},
+{"LTORG", {"05", 0}},
+{"ORIGIN", {"03", 1}},
+{"START", {"01", 1}},
+{"EQU", {"04", 2}},
+{"DS", {"01", 1}},
+{"DC", {"02", 1}},
+{"END", {"AD", 0}}
+};
+
+
+// Split assembly code into lines
+stringstream ss(assemblyCode);
+string line;
+while (getline(ss, line, '\n')) {
+if (line.empty()) {
+continue;
+}
+
+
+stringstream lineStream(line);
+string token;
+lineStream >> token;
+
+
+if (reservedMnemonics.count(token) > 0) {
+if (token == "START") {
+lineStream >> address;
+} else if (token == "END") {
+break;
+} else if (token == "LTORG" || token == "ORIGIN" || token == "EQU") {
+continue;
+} else {
+address++;
+}
+} else {
+symbolTable[token] = address;
+address++;
+}
+}
+
+
+// Second Pass: Update Address for Data Storage (DS directive)
+address--; // Adjust address for data storage after the last instruction
+stringstream ss2(assemblyCode);
+while (getline(ss2, line, '\n')) {
+if (line.empty()) {
+continue;
+}
+
+
+stringstream lineStream(line);
+string token;
+lineStream >> token;
+
+
+if (token == "DS") {
+string symbol;
+int size;
+lineStream >> symbol >> size;
+symbolTable[symbol] = address;
+address += size;
+}
+}
+
+
+return symbolTable;
+}
+
+
+int main() {
+// Example Assembly Language Code
+string assemblyCode = R"(
+START 180
+READ M
+READ N
+LOOP MOVER AREG, M
+MOVER BREG, N
+COMP BREG, ='200'
+BC GT, LOOP
+BACK SUB AREG, M
+COMP AREG, ='500'
+BC LT, BACK
+STOP
+M DS 1
+N DS 1
+END
+)";
+
+
+// Generate symbol table from assembly code
+unordered_map<string, int> symbolTable = generateSymbolTable(assemblyCode);
+
+
+// Print symbol table
+cout << "-------------" << endl;
+cout << "Symbol | Address" << endl;
+cout << "--------------------" << endl;
+for (const auto& entry : symbolTable) {
+cout << entry.first << " | " << entry.second << endl;
+}
+
+
+return 0;
+}
+
+
+Q2.Write a program to generate Literal table of a two-pass Assembler for the given Assembly
+language source code.
+INPUT/CODE
+START 100 READ A
+READ B MOVER AREG, =’50'
+MOVER BREG, =’60’ ADD AREG, BREG
+LOOP MOVER CREG, A
+ADD CREG, ='10'
+COMP CREG, B
+BC LT, LOOP NEXT SUB AREG, ='10'
+COMP AREG, B BC GT, NEXT STOP
+* A  DS1
+* B  DS1
+END
+CODE:
+#include <iostream>
+#include <sstream>
+#include <unordered_map>
+#include <vector>
+#include <string>
+#include <cctype> // For isdigit()
+
+
+using namespace std;
+
+
+// Function to generate Literal table from assembly code
+unordered_map<string, int> generateLiteralTable(const string& assemblyCode) {
+unordered_map<string, int> literalTable;
+int currentAddress = 0;
+
+
+// Split assembly code into lines
+stringstream ss(assemblyCode);
+string line;
+while (getline(ss, line, '\n')) {
+if (line.empty()) {
+continue;
+}
+
+
+stringstream lineStream(line);
+string token;
+lineStream >> token;
+
+
+// Check for instructions that involve literals
+if (token == "MOVER" || token == "ADD" || token == "COMP" || token == "SUB") {
+string operand1, operand2;
+lineStream >> operand1 >> operand2;
+
+
+// Check if operand is a literal (e.g., ='50')
+if (operand2.size() > 2 && operand2[0] == '=' && operand2[1] == '\'') {
+// Extract the literal value
+string literal = operand2.substr(2, operand2.size() - 3);
+
+
+// Add literal to the table if not already present
+if (literalTable.find(literal) == literalTable.end()) {
+literalTable[literal] = currentAddress++;
+}
+}
+}
+}
+
+
+return literalTable;
+}
+
+
+int main() {
+// Example Assembly Language Code
+string assemblyCode = R"(
+START 100
+READ A
+READ B
+MOVER AREG, ='50'
+MOVER BREG, ='60'
+ADD AREG, BREG
+LOOP MOVER CREG, A
+ADD CREG, ='10'
+COMP CREG, B
+BC LT, LOOP
+NEXT SUB AREG, ='10'
+COMP AREG, B
+BC GT, NEXT
+STOP
+A DS 1
+B DS 1
+END
+)";
+
+
+// Generate literal table from assembly code
+unordered_map<string, int> literalTable = generateLiteralTable(assemblyCode);
+
+
+// Print literal table
+cout << "-------------" << endl;
+cout << "Literal | Address" << endl;
+cout << "--------------------" << endl;
+for (const auto& entry : literalTable) {
+cout << entry.first << " | " << entry.second << endl;
+}
+
+
+return 0;
+}
+
+
+Q3.Write a program to generate Pool table of a two-pass Assembler for the given Assembly language source code.
+INPUT/CODE
+READ A MOVER AREG, ='1'
+MOVEM AREG, B MOVER BREG, ='6' ADD AREG, BREG COMP AREG, A BC GT, LAST LTORG
+NEXT SUB AREG, ='1'
+MOVER CREG, B
+ADD CREG, ='8' MOVEM CREG, B PRINT B
+LAST STOP
+A DS 1
+B DS 1 END
+CODE:
+ #include <iostream>
+#include <sstream>
+#include <vector>
+#include <string>
+
+
+using namespace std;
+
+
+// Function to generate Pool table from assembly code
+vector<int> generatePoolTable(const string& assemblyCode) {
+vector<int> poolTable;
+int currentPoolStart = -1;
+int currentAddress = 0;
+
+
+// Split assembly code into lines
+stringstream ss(assemblyCode);
+string line;
+while (getline(ss, line, '\n')) {
+if (line.empty()) {
+continue;
+}
+
+
+stringstream lineStream(line);
+string token;
+lineStream >> token;
+
+
+// Check for LTORG directive to identify the end of a literal pool
+if (token == "LTORG") {
+if (currentPoolStart != -1) {
+// End of current pool, record the pool start address
+poolTable.push_back(currentPoolStart);
+currentPoolStart = -1;
+}
+} else if (token == "MOVER" || token == "MOVEM" || token == "ADD" || token == "COMP" || token == "SUB" || token == "PRINT") {
+string operand;
+while (lineStream >> operand) {
+size_t startQuotePos = operand.find("='");
+size_t endQuotePos = operand.find("'", startQuotePos + 2);
+if (startQuotePos != string::npos && endQuotePos != string::npos) {
+// Literal found, check if it's the start of a new pool
+if (currentPoolStart == -1) {
+currentPoolStart = currentAddress; // Use current address as pool start
+}
+}
+}
+}
+
+
+// Increment current address for each line
+currentAddress++;
+}
+
+
+// Check if there's an open pool at the end of the code
+if (currentPoolStart != -1) {
+poolTable.push_back(currentPoolStart);
+}
+
+
+return poolTable;
+}
+
+
+int main() {
+// Example Assembly Language Code
+string assemblyCode = R"(
+START 100
+READ A
+MOVER AREG, ='1'
+MOVEM AREG, B
+MOVER BREG, ='6'
+ADD AREG, BREG
+COMP AREG, A
+BC GT, LAST
+LTORG
+NEXT SUB AREG, ='1' MOVER CREG, B
+ADD CREG, ='8'
+MOVEM CREG, B
+PRINT B
+LAST STOP
+A DS 1
+B DS 1
+END
+)";
+
+
+// Generate pool table from assembly code
+vector<int> poolTable = generatePoolTable(assemblyCode);
+
+
+// Print pool table in the expected format
+cout << "-------------" << endl;
+cout << "Pool Address" << endl;
+cout << "-------------" << endl;
+for (size_t i = 0; i < poolTable.size(); ++i) {
+cout << "Pool " << i + 1 << ": " << poolTable[i] << endl;
+}
+
+
+return 0;
+}
+Q4. Write a program to generate Intermediate code of a two-pass Assembler for the given Assembly language source code.
+INPUT/CODE
+START 100 READ A
+READ B
+MOVER AREG, A SUB AREG, B STOP
+   * A  DS1
+   * B  DS1
+END
+CODE:
+#include <iostream>
+#include <sstream>
+#include <vector>
+#include <unordered_map>
+#include <string>
+#include <algorithm>
+
+
+using namespace std;
+
+
+// Function to generate Intermediate code from assembly code
+vector<string> generateIntermediateCode(const string& assemblyCode) {
+vector<string> intermediateCode;
+unordered_map<string, int> symbolTable;
+unordered_map<string, int> dataAllocation;
+int currentAddress = 0;
+int dataOffset = 0;
+
+
+// First Pass: Process instructions and build symbol table
+stringstream ss(assemblyCode);
+string line;
+while (getline(ss, line, '\n')) {
+if (line.empty()) {
+continue;
+}
+
+
+istringstream lineStream(line);
+string token;
+lineStream >> token;
+
+
+if (token == "START") {
+lineStream >> currentAddress;
+} else if (token == "END") {
+break;
+} else if (token == "DS") {
+string varName;
+int varSize;
+lineStream >> varName >> varSize;
+dataAllocation[varName] = dataOffset;
+dataOffset += varSize;
+} else if (token.back() == ':') {
+// Label definition
+string label = token.substr(0, token.length() - 1);
+symbolTable[label] = currentAddress;
+} else {
+// Instruction with operands
+string opcode = token;
+string operands;
+getline(lineStream >> ws, operands);
+operands.erase(remove(operands.begin(), operands.end(), ','), operands.end());
+
+
+// Replace labels with addresses in operands
+stringstream operandStream(operands);
+string operand;
+string updatedOperands;
+while (getline(operandStream, operand, ' ')) {
+if (symbolTable.find(operand) != symbolTable.end()) {
+operand = to_string(symbolTable[operand]);
+}
+updatedOperands += operand + " ";
+}
+
+
+intermediateCode.push_back(to_string(currentAddress) + ": " + opcode + " " + updatedOperands);
+currentAddress++;
+}
+}
+
+
+// Second Pass: Update intermediate code with data allocation information
+for (auto& data : dataAllocation) {
+intermediateCode.push_back(to_string(currentAddress) + ": DS " + data.first + ", " + to_string(data.second));
+currentAddress++;
+}
+
+
+return intermediateCode;
+}
+
+
+int main() {
+// Example Assembly Language Code
+string assemblyCode = R"(
+START 100
+READ A
+READ B
+MOVER AREG, A
+SUB AREG, B
+STOP
+A DS 1
+B DS 1
+END
+)";
+
+
+// Generate intermediate code from assembly code
+vector<string> intermediateCode = generateIntermediateCode(assemblyCode);
+
+
+// Print intermediate code
+for (const string& codeLine : intermediateCode) {
+cout << codeLine << endl;
+}
+
+
+return 0;
+}
+Q5. Write a program to generate Intermediate code of a two-pass Macro processor.
+INPUT/CODE
+LOAD A
+MACRO ABC LOAD p
+SUB q
+MEND
+STORE B
+MULT D
+MACRO ADD1 ARG LOAD X
+STORE ARG
+MEND
+...continued...
+	...continued...
+LOAD B
+MACRO ADD5 A1, A2, A3 STORE A2
+ADD1 5
+ADD1 10
+LOAD A1
+LOAD A3
+MEND
+ADD1 t
+ABC
+ADD5 D1, D2, D3
+END
+	CODE:
+#include <iostream>
+#include <sstream>
+#include <vector>
+#include <unordered_map>
+#include <string>
+
+
+using namespace std;
+
+
+// Symbol table to store macro definitions
+unordered_map<string, vector<string>> macroTable;
+
+
+// Function to expand macros in the given code
+vector<string> expandMacros(const string& code) {
+vector<string> expandedCode;
+stringstream ss(code);
+string line;
+
+
+while (getline(ss, line, '\n')) {
+if (line.empty()) {
+continue;
+}
+
+
+istringstream lineStream(line);
+string token;
+lineStream >> token;
+
+
+if (token == "MACRO") {
+// Extract macro name and parameters
+string macroName;
+lineStream >> macroName;
+vector<string> macroDefinition;
+while (getline(ss, line, '\n')) {
+if (line == "MEND") {
+break;
+}
+macroDefinition.push_back(line);
+}
+macroTable[macroName] = macroDefinition;
+} else if (macroTable.find(token) != macroTable.end()) {
+// Macro call detected, expand the macro
+const vector<string>& macroDefinition = macroTable[token];
+for (const string& macroLine : macroDefinition) {
+expandedCode.push_back(macroLine);
+}
+} else {
+// Normal instruction, add to expanded code
+expandedCode.push_back(line);
+}
+}
+
+
+return expandedCode;
+}
+
+
+// Function to generate Intermediate code from expanded macro code
+vector<string> generateIntermediateCode(const vector<string>& expandedCode) {
+vector<string> intermediateCode;
+int lineNum = 1;
+
+
+for (const string& line : expandedCode) {
+if (line.empty()) {
+continue;
+}
+
+
+istringstream lineStream(line);
+string token;
+lineStream >> token;
+
+
+if (token == "LOAD" || token == "STORE" || token == "ADD" || token == "SUB" || token == "MULT" || token == "END") {
+// Process instructions directly into intermediate code
+intermediateCode.push_back(to_string(lineNum) + ": " + line);
+lineNum++;
+} else if (token == "MACRO") {
+// Skip macro definitions in intermediate code generation
+continue;
+}
+}
+
+
+return intermediateCode;
+}
+
+
+int main() {
+// Example Macro-Expanded Code
+string code = R"(
+LOAD A
+MACRO ABC
+LOAD p
+SUB q
+MEND
+STORE B
+MULT D
+MACRO ADD1 ARG
+LOAD X
+STORE ARG
+MEND
+LOAD B
+MACRO ADD5 A1, A2, A3
+STORE A2
+ADD1 5
+ADD1 10
+LOAD A1
+LOAD A3
+MEND
+ADD1 t
+ABC
+ADD5 D1, D2, D3
+END
+)";
+
+
+// Expand macros in the code
+vector<string> expandedCode = expandMacros(code);
+
+
+// Generate Intermediate code from expanded code
+vector<string> intermediateCode = generateIntermediateCode(expandedCode);
+
+
+// Print Intermediate code
+cout << "Intermediate Code:" << endl;
+for (const string& line : intermediateCode) {
+cout << line << endl;
+}
+
+
+return 0;
+}
+
+
+Q6. #include <iostream>
+#include <unordered_map>
+#include <vector>
+#include <sstream>
+
+
+using namespace std;
+
+
+unordered_map<string, vector<string>> macro_table;
+
+
+// Function to expand macros in the code
+vector<string> expand_macros(const vector<string>& code) {
+vector<string> expanded_code;
+
+
+for (const auto& line : code) {
+stringstream ss(line);
+string token;
+ss >> token;
+
+
+if (macro_table.count(token) > 0) {
+// Replace macro call with macro definition
+const vector<string>& macro_definition = macro_table[token];
+expanded_code.insert(expanded_code.end(), macro_definition.begin(), macro_definition.end());
+} else {
+// Regular instruction, add to expanded code
+expanded_code.push_back(line);
+}
+}
+
+
+return expanded_code;
+}
+
+
+// Function to generate Intermediate code from expanded code
+vector<string> generate_intermediate_code(const vector<string>& code) {
+vector<string> intermediate_code;
+int line_num = 1;
+
+
+for (const auto& line : code) {
+intermediate_code.push_back(to_string(line_num) + ": " + line);
+line_num++;
+}
+
+
+return intermediate_code;
+}
+
+
+int main() {
+// Example Macro-Expanded Code
+vector<string> code = {
+"LOAD J",
+"STORE M",
+"MACRO EST",
+"LOAD P",
+"ADD V",
+"MEND",
+"LOAD S",
+"MACRO ADD7 P4, P5, P6",
+"LOAD P5",
+"LOAD e",
+"ADD d",
+"MEND",
+"LOAD S",
+"MACRO SUB4 ABC",
+"LOAD U",
+"STORE ABC",
+"MEND",
+"SUB4 XYZ",
+"SUB 8",
+"SUB 2",
+"STORE P4",
+"STORE P6",
+"MEND",
+"EST",
+"ADD7 C4, C5",
+"SUB4 z",
+"END"
+};
+
+
+// Populate macro table with macro definitions
+macro_table["EST"] = {"LOAD P", "ADD V"};
+macro_table["ADD7"] = {"LOAD P5", "LOAD e", "ADD d"};
+macro_table["SUB4"] = {"LOAD U", "STORE ABC"};
+
+
+// Expand macros in the code
+vector<string> expanded_code = expand_macros(code);
+
+
+// Generate Intermediate code from expanded code
+vector<string> intermediate_code = generate_intermediate_code(expanded_code);
+
+
+// Print Intermediate code
+cout << "Intermediate Code:" << endl;
+for (const auto& line : intermediate_code) {
+cout << line << endl;
+}
+
+
+return 0;
+}
+
+
+Q6. Write a program to generate MDT MNT(Macro Definition Table) of a two-pass Macro processor.
+INPUT/CODE
+LOAD A STORE B MACRO ABC LOAD p
+SUB q
+MEND
+MACRO ADD1 ARG LOAD X
+STORE ARG
+MEND
+....Continued....
+	...continued....
+MACRO ADD5 A1, A2, A3 STORE A2
+ADD1 5
+ADD1 10
+LOAD A1
+LOAD A3
+MEND
+ABC
+ADD5 D1, D2, D3 END
+	CODE:
+#include <iostream>
+#include <unordered_map>
+#include <vector>
+#include <sstream>
+
+
+using namespace std;
+
+
+// Function to generate MNT and MDT
+pair<unordered_map<string, pair<int, vector<string>>>, unordered_map<int, vector<string>>> generate_mnt_mdt(const vector<string>& code) {
+unordered_map<string, pair<int, vector<string>>> mnt; // Macro Name Table (MNT)
+unordered_map<int, vector<string>> mdt; // Macro Definition Table (MDT)
+int mdt_index = 1;
+
+
+for (int i = 0; i < code.size(); ++i) {
+string line = code[i];
+stringstream ss(line);
+string token;
+ss >> token;
+
+
+if (token == "MACRO") {
+// Macro definition found
+ss >> token; // Read macro name
+string macro_name = token;
+vector<string> parameters;
+
+
+// Read macro parameters
+while (ss >> token) {
+if (token == "MEND") {
+break;
+}
+parameters.push_back(token);
+}
+
+
+// Collect macro definition
+vector<string> macro_definition;
+++i; // Move to next line after "MACRO"
+while (i < code.size() && code[i] != "MEND") {
+macro_definition.push_back(code[i]);
+++i;
+}
+
+
+// Record macro details in MNT
+mnt[macro_name] = {mdt_index, parameters};
+
+
+// Record macro definition in MDT
+mdt[mdt_index] = macro_definition;
+++mdt_index;
+}
+}
+
+
+return make_pair(mnt, mdt);
+}
+
+
+int main() {
+// Example Macro-Expanded Code
+vector<string> code = {
+"LOAD A",
+"STORE B",
+"MACRO ABC",
+"LOAD p",
+"SUB q",
+"MEND",
+"MACRO ADD1 ARG",
+"LOAD X",
+"STORE ARG",
+"MEND",
+"MACRO ADD5 A1, A2, A3",
+"STORE A2",
+"ADD1 5",
+"ADD1 10",
+"LOAD A1",
+"LOAD A3",
+"MEND",
+"ABC",
+"ADD5 D1, D2, D3",
+"END"
+};
+
+
+// Generate MNT and MDT
+auto result = generate_mnt_mdt(code);
+unordered_map<string, pair<int, vector<string>>> mnt = result.first;
+unordered_map<int, vector<string>> mdt = result.second;
+
+
+// Print Macro Name Table (MNT)
+cout << "Macro Name Table (MNT):" << endl;
+cout << "Macro Name\tMDT Index\tParameters" << endl;
+cout << "----------------------------------------------" << endl;
+for (const auto& entry : mnt) {
+const string& macro_name = entry.first;
+const auto& details = entry.second;
+cout << macro_name << "\t\t" << details.first << "\t\t";
+if (details.second.empty()) {
+cout << "None";
+} else {
+for (const auto& param : details.second) {
+cout << param << " ";
+}
+}
+cout << endl;
+}
+
+
+// Print Macro Definition Table (MDT)
+cout << endl << "Macro Definition Table (MDT):" << endl;
+cout << "MDT Index\tMacro Definition" << endl;
+cout << "----------------------------------------------" << endl;
+for (const auto& entry : mdt) {
+int index = entry.first;
+const vector<string>& definition = entry.second;
+cout << index << "\t\t";
+for (const auto& line : definition) {
+cout << line << endl << "\t\t";
+}
+cout << endl;
+}
+
+
+return 0;
+}
+
+
+Q8. Write a program using LEX Tool, to implement a lexical analyzer for parts of speech for given
+English language without Symbol table.
+INPUT
+Dread it. Run from it.
+Destiny arrives all the same.
+CODE:
+%{
+#include <stdio.h>
+%}
+
+
+%%
+
+
+"the" | "a" | "an" {printf("Article: %s\n", yytext);}
+
+
+
+
+"it" | "he" | "she" | "they" {printf("Pronoun: %s\n", yytext);}
+
+
+
+
+"is" | "was" | "had" | "do" | "run" | "dread" |"arrives" {printf("Verb: %s\n", yytext);}
+
+
+
+
+"to" | "in" | "on" | "with" {printf("Preposition: %s\n", yytext);}
+
+
+"Destiny" {printf("Noun: %s\n", yytext);}
+
+
+[\n\t]+   { /* Ignore everything else */ }
+
+
+%%
+
+
+int yywrap(){
+        return 1;
+}
+
+
+int main() {
+    char input[] = "Dread it. Run from it. Destiny arrives all the same.";
+    yy_scan_string(input);
+    yylex();
+    return 0;
+}
+Q9. Write a program using LEX Tool, to implement a lexical analyzer for given C programming language without Symbol table.
+INPUT
+{int m=10,n=2,o;
+o = m – n;}
+CODE:
+%{
+#include <stdio.h>
+%}
+
+
+%%
+
+
+"int" { printf("Keyword: int\n"); }
+"="   { printf("Equal to\n"); }
+";"   { printf("Semicolon\n"); }
+"{"   { printf("Left Brace\n"); }
+"}"   { printf("Right Brace\n"); }
+"+"   { printf("Add\n"); }
+"-"   { printf("Subtract\n"); }
+"*"   { printf("Multiply\n"); }
+"/"   { printf("Divide\n"); }
+[0-9]+ { printf("Numeric\n"); }
+[a-zA-Z_][a-zA-Z0-9_]* { printf("Identifier\n"); }
+[ \t\n] ; /* ignore other characters */
+.     { printf("Unknown: %s\n", yytext); };
+
+
+%%
+
+
+int yywrap() {
+    return 1;
+};
+int main() {
+  char input[] = "int m=10,n=2,o;\no=m-n;";
+  yy_scan_string(input);
+  yylex();
+  return 0;
+}
+Q10. Write a program using LEX Tool, to implement a lexical analyzer for given C programming language without Symbol table.
+INPUT
+{
+int a=3;
+int b=4;
+float c;
+c = (a*a + b*b) *2 }
+CODE:
+%{
+#include <stdio.h>
+%}
+%%
+
+
+"int"    { printf("Keyword: int\n"); }
+"float"  { printf("Keyword: float\n"); }
+[a-zA-Z_][a-zA-Z0-9_]* { printf("Identifier: %s\n", yytext); }
+[0-9]+   { printf("Numeric: %s\n", yytext); }
+"="      { printf("Assignment operator: =\n"); }
+"+"      { printf("Addition operator: +\n"); }
+"*"      { printf("Multiplication operator: *\n"); }
+"("      { printf("Left Parenthesis\n"); }
+")"      { printf("Right Parenthesis\n"); }
+";"      { printf("Semicolon\n"); }
+\n       { /* Newline, do nothing */ }
+[ \t]    { /* Whitespace, do nothing */ }
+.        { printf("Unknown: %s\n", yytext); }
+
+
+%%
+int yywrap() {
+    return 1; // Indicate end of input
+}
+int main() {
+    char input[] = "{\nint a=3;\nint b=4;\nfloat c;\nc = (a*a + b*b) *2\n}";
+    yy_scan_string(input); // Set input string
+    yylex(); // Call lexer
+    return 0;
+}
+
+
+Q11.Write a program using LEX Tool, to implement a lexical analyzer for given C programming language without Symbol table.
+INPUT
+{
+int total =100;
+inti=10;
+printf("The value of total and i is : %d, %d", total, i);
+}
+CODE:
+%{
+#include <stdio.h>
+#include <string.h>
+
+
+int total_value = 0;
+int i_value = 0;
+%}
+
+
+%%
+
+
+"int"    { printf("Keyword: int\n"); }
+"printf" { printf("Function: printf\n"); }
+"\""     { printf("Double quote\n"); }
+"="      { printf("Assignment operator: =\n"); }
+","      { printf("Comma\n"); }
+";"      { printf("Semicolon\n"); }
+[0-9]+   { printf("Numeric: %s\n", yytext); }
+[a-zA-Z_][a-zA-Z0-9_]* { printf("Identifier: %s\n", yytext); }
+"("      { printf("Left Parenthesis\n"); }
+")"      { printf("Right Parenthesis\n"); }
+"%"      { printf("Percentage\n"); }
+\n       { /* Newline, do nothing */ }
+[ \t]    { /* Whitespace, do nothing */ }
+.        { printf("Unknown: %s\n", yytext); }
+
+
+%%
+
+
+int yywrap() {
+    return 1;
+}
+int main() {
+    char input[] = "{\nint total = 100;\nint i = 10;\nprintf(\"The value of total and i is : %d, %d\", total, i);\n}";
+    yy_scan_string(input);
+    yylex();
+    return 0;
+}
+Q10 .Write a program to evaluate a given arithmetic expression using YACC specification. INPUT
+0.33*12-4-4+(3*2)
+
+
+LEX:
+%{
+#include "10pb.tab.h"
+#include <stdlib.h>
+%}
+
+
+%%
+
+
+[0-9]+(\.[0-9]+)? { yylval = atof(yytext); return NUMBER; }
+\n { return EOL; }
+. { return yytext[0]; }
+
+
+%%
+
+
+YACC:
+%{
+#include <stdio.h>
+#define YYSTYPE double
+%}
+
+
+%token NUMBER EOL
+
+
+%%
+
+
+program: /* empty */
+| program statement EOL
+;
+
+
+statement: expression { printf("Result: %f\n", $1); }
+;
+
+
+expression: NUMBER
+| expression '+' expression { $$ = $1 + $3; }
+| expression '+' expression { $$ = $1 + $3; }
+| expression '-' expression { $$ = $1 - $3; }
+| expression '*' expression { $$ = $1 * $3; }
+| expression '/' expression { $$ = $1 / $3; }
+| '(' expression ')' { $$ = $2; }
+;
+
+
+%%
+
+
+int main(void) {
+yyparse();
+return 0;
+}
+
+
+void yyerror(char *s) {
+fprintf(stderr, "error: %s\n", s);
+}
+
+
+Q11 A 1) pune
+2) PUNE 3) Pune1 4) pUNE_2
+(A)11.Write a program to evaluate a given variable name using YACC specification.
+LEX:
+%{
+#include "11apb.tab.h"
+#include <stdlib.h>
+%}
+
+
+%%
+
+
+[a-zA-Z_][a-zA-Z0-9_]* { yylval = strdup(yytext); return IDENTIFIER; }
+\n { return EOL; }
+. { return yytext[0]; }
+
+
+%%
+YACC:
+%{
+#include <stdio.h>
+#define YYSTYPE char*
+%}
+
+
+%token IDENTIFIER EOL
+
+
+%%
+
+
+program: /* empty */
+| program statement EOL
+;
+
+
+statement: IDENTIFIER { printf("Valid variable name: %s\n", $1); free($1); }
+;
+
+
+%%
+
+
+int main(void) {
+yyparse();
+return 0;
+}
+
+
+void yyerror(char *s) {
+fprintf(stderr, "error: %s\n", s);
+}
+Q11 C
+%{
+#include "y.tab.h"
+#include <stdlib.h>
+%}
+
+
+%%
+
+
+[0-9]+ { yylval = atoi(yytext); return NUMBER; }
+"sqrt" { return SQRT; }
+"strlen" { return STRLEN; }
+"(" { return LPAREN; }
+")" { return RPAREN; }
+"=" { return EQUAL; }
+[a-zA-Z][a-zA-Z0-9]* { yylval = strdup(yytext); return IDENTIFIER; }
+\".*\" { yylval = strdup(yytext); return STRING; }
+\n { return EOL; }
+. { return yytext[0]; }
+
+
+%%
+
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#define YYSTYPE char*
+%}
+
+
+%token NUMBER SQRT STRLEN LPAREN RPAREN EQUAL IDENTIFIER STRING EOL
+
+
+%%
+
+
+program: /* empty */
+| program statement EOL
+;
+
+
+statement: IDENTIFIER EQUAL expression { printf("%s = %s\n", $1, $3); free($1); free($3); }
+;
+
+
+expression: NUMBER
+| STRING
+| SQRT LPAREN expression RPAREN { sprintf($$, "%f", sqrt(atof($3))); free($3); }
+| STRLEN LPAREN expression RPAREN { sprintf($$, "%ld", strlen($3) - 2); free($3); }
+;
+
+
+%%
+
+
+int main(void) {
+yyparse();
+return 0;
+}
+
+
+void yyerror(char *s) {
+fprintf(stderr, "error: %s\n", s);
+}
+Q.11C .Write a program to evaluate a given built-in functions using YACC specification.
+INPUT
+u= sin(12)+cos(12)
+%{
+#include "11dpb.tab.h"
+#include <stdlib.h>
+#include <math.h>
+%}
+
+
+%%
+
+
+[0-9]+(\.[0-9]+)? { yylval = atof(yytext); return NUMBER; }
+"sin" { return SIN; }
+"cos" { return COS; }
+"(" { return LPAREN; }
+")" { return RPAREN; }
+"=" { return EQUAL; }
+[a-zA-Z][a-zA-Z0-9]* { yylval = strdup(yytext); return IDENTIFIER; }
+\n { return EOL; }
+. { return yytext[0]; }
+
+
+%%
+
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#define YYSTYPE double
+%}
+
+
+%token NUMBER SIN COS LPAREN RPAREN EQUAL IDENTIFIER EOL
+
+
+%%
+
+
+program: /* empty */
+| program statement EOL
+;
+
+
+statement: IDENTIFIER EQUAL expression { printf("%s = %f\n", $1, $3); free($1); }
+;
+
+
+expression: NUMBER
+| SIN LPAREN expression RPAREN { $$ = sin($3); }
+| COS LPAREN expression RPAREN { $$ = cos($3); }
+| expression '+' expression { $$ = $1 + $3; }
+| expression '-' expression { $$ = $1 - $3; }
+;
+
+
+%%
+
+
+int main(void) {
+yyparse();
+return 0;
+}
+
+
+void yyerror(char *s) {
+fprintf(stderr, "error: %s\n", s);
+}
+Q 11D.
+%{
+#include "y.tab.h"
+#include <stdlib.h>
+%}
+
+
+%%
+
+
+[0-9]+(\.[0-9]+)? { yylval = atof(yytext); return NUMBER; }
+"pow" { return POW; }
+"log" { return LOG; }
+"(" { return LPAREN; }
+")" { return RPAREN; }
+"," { return COMMA; }
+"=" { return EQUAL; }
+[a-zA-Z][a-zA-Z0-9]* { yylval = strdup(yytext); return IDENTIFIER; }
+\n { return EOL; }
+. { return yytext[0]; }
+
+
+%%
+
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#define YYSTYPE double
+%}
+
+
+%token NUMBER POW LOG LPAREN RPAREN COMMA EQUAL IDENTIFIER EOL
+
+
+%%
+
+
+program: /* empty */
+| program statement EOL
+;
+
+
+statement: IDENTIFIER EQUAL expression { printf("%s = %f\n", $1, $3); free($1); }
+;
+
+
+expression: NUMBER
+| POW LPAREN expression COMMA expression RPAREN { $$ = pow($3, $5); }
+| LOG LPAREN expression RPAREN { $$ = log($3); }
+| expression '/' expression { $$ = $1 / $3; }
+;
+
+
+%%
+
+
+int main(void) {
+yyparse();
+return 0;
+}
+
+
+void yyerror(char *s) {
+fprintf(stderr, "error: %s\n", s);
+}
+Q 12.Write a program to generate three address code for the given simple expression.
+INPUT
+w = u*u - u*v+ v*v
+CODE:
+
+
+#include <iostream>
+#include <vector>
+#include <sstream>
+
+
+std::vector<std::string> generate_three_address_code(std::string expression) {
+std::vector<std::string> tokens;
+std::istringstream iss(expression);
+for(std::string s; iss >> s; )
+tokens.push_back(s);
+
+
+int temp_var_counter = 1;
+std::vector<std::string> three_address_code;
+
+
+for(int i = 2; i < tokens.size(); i += 2) {
+if(i == 2)
+three_address_code.push_back("t" + std::to_string(temp_var_counter) + " = " + tokens[i-1] + " " + tokens[i] + " " + tokens[i+1]);
+else
+three_address_code.push_back("t" + std::to_string(temp_var_counter) + " = t" + std::to_string(temp_var_counter-1) + " " + tokens[i] + " " + tokens[i+1]);
+
+
+temp_var_counter++;
+}
+
+
+three_address_code.push_back(tokens[0] + " = t" + std::to_string(temp_var_counter-1));
+
+
+return three_address_code;
+}
+
+
+int main() {
+std::string expression = "w = u * u - u * v + v * v";
+std::vector<std::string> three_address_code = generate_three_address_code(expression);
+
+
+for(const auto &code : three_address_code)
+std::cout << code << std::endl;
+
+
+return 0;
+}
